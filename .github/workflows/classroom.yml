@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Ensure submission.txt exists
@@ -20,43 +20,37 @@ jobs:
             exit 1
           fi
 
-      - name: Read URL into env
+      - name: Read URL
         run: |
-          # remove CRLF and trim spaces
           URL="$(cat submission.txt | tr -d '\r\n' | xargs)"
-          echo "URL=$URL" >> "$GITHUB_ENV"
-          echo "Submitted URL: $URL"
 
-      - name: Validate URL format
-        run: |
-          if [[ -z "$URL" ]]; then
-            echo "Empty URL in submission.txt"
+          if [ -z "$URL" ]; then
+            echo "submission.txt is empty"
             exit 1
           fi
+
           if [[ ! "$URL" =~ ^https?:// ]]; then
             echo "Invalid URL format (must start with http:// or https://)"
             exit 1
           fi
 
-      - name: Curl and content check (CSC309 on homepage)
+          echo "URL=$URL" >> "$GITHUB_ENV"
+          echo "Submitted URL: $URL"
+
+      - name: Check deployment and content
         run: |
-          set -e
+          set -eo pipefail
 
-          # Fetch once: save body, capture status
-          STATUS=$(curl -L --fail -sS --max-time 15 \
-            -o body.html -w "%{http_code}" "$URL")
+          echo "Fetching: $URL"
 
-          echo "HTTP Status: $STATUS"
-          if [ "$STATUS" -ne 200 ]; then
-            echo "Expected 200 OK, got $STATUS"
-            exit 1
-          fi
+          # Will automatically fail if not 200
+          curl -L --fail --max-time 20 "$URL" -o body.html
 
           echo "Checking page content for CSC309..."
+
           if ! grep -q "CSC309" body.html; then
-            echo "Expected content 'CSC309' not found."
+            echo "Expected content 'CSC309' not found on homepage."
             exit 1
           fi
 
-      - name: Success
-        run: echo "Deployment reachable and contains CSC309. Test passed."
+          echo "Deployment reachable and contains CSC309."
